@@ -19,7 +19,7 @@ import {
 } from '@/lib/server/repo';
 import { assessWorkloadForUser, buildPlanForUser, getProgressOverview } from '@/lib/server/planning';
 import { resolveAIForUser, isDemo } from '@/lib/server/ai';
-import { getActiveStoreName, isSupabaseConfigured } from '@/lib/server/store';
+import { getActiveStoreName, isEphemeralStore, isSupabaseConfigured } from '@/lib/server/store';
 
 /**
  * One round trip for the whole client store (plan section 13: "what to do now",
@@ -68,7 +68,11 @@ export async function GET() {
       ai: status,
       ai_settings: toPublicAISettings(getAISettings(db, user.id)),
       demo_mode: isDemo(db, user),
-      store: { active: getActiveStoreName(), supabase_configured: isSupabaseConfigured() },
+      store: {
+        active: getActiveStoreName(),
+        supabase_configured: isSupabaseConfigured(),
+        ephemeral: isEphemeralStore(),
+      },
     });
   });
 }

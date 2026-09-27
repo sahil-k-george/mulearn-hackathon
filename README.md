@@ -141,10 +141,12 @@ in Settings, rather than silently receiving mock output. Anyone may still explic
 
 ### Data store
 
-- **Default:** local JSON file at `.data/db.json` — zero config.
-- **Supabase failover:** set `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` (or
-  `NEXT_PUBLIC_SUPABASE_URL` + `NEXT_PUBLIC_SUPABASE_ANON_KEY`). Supabase becomes the primary
-  store, and the file store takes over automatically if Supabase errors. Create the table once:
+Storage resolves in three tiers, degrading automatically:
+
+1. **Supabase** — set `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` (or
+   `NEXT_PUBLIC_SUPABASE_URL` + `NEXT_PUBLIC_SUPABASE_ANON_KEY`). Durable and shared across
+   instances, and the only option suitable for a real deployment. If Supabase errors, the app
+   falls through to the next tier. Create the table once:
 
 ```sql
 create table if not exists app_state (
@@ -153,6 +155,18 @@ create table if not exists app_state (
   updated_at timestamptz not null default now()
 );
 ```
+
+2. **Local JSON file** at `.data/db.json` — zero config, used automatically when the filesystem
+   is writable. Right for local dev and for hosts with a persistent volume.
+3. **In-memory** — last resort when the filesystem is read-only.
+
+> **Deploying to Vercel / Netlify?** Their serverless filesystems are read-only apart from
+> `/tmp`, so tier 2 cannot work and the app runs on tier 3. The demo account will sign in, but
+> **data is lost whenever the instance is recycled**, and sessions do not survive it, so a signed-in
+> user can be bounced back to the login screen at random. For a stable deployment, configure
+> Supabase. `GET /api/bootstrap` reports the live tier as `store.active` (`supabase` | `file` |
+> `memory`) plus `store.ephemeral`.
+
 
 ---
 
