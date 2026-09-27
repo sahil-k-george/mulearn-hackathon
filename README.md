@@ -1,14 +1,17 @@
 # Adaptive — Academic Companion
 
-> An adaptive academic companion that turns unstructured student workload into realistic,
-> personalised and collaborative action plans.
+**Team Kryon** · Sahil K George · Karthik G Pilla · Pranav Narayanan · Jestes Jen
 
-Adaptive is a student-centric web app that converts messy input (a "brain dump"), available
-time, knowledge level and goals into a realistic, explainable and **adaptive** study plan — with
-a Team Mode for shared goals that still keeps each student's plan personal.
+An adaptive academic companion that turns unstructured student workload into realistic,
+personalised and collaborative action plans.
+
+Adaptive is a student-centric web app that converts messy input — a brain dump, a PDF of
+lecture notes, your available time and knowledge level — into a realistic, explainable and
+**adaptive** study plan, with a Team Mode for shared goals that still keeps each student's
+plan personal.
 
 Built on **Next.js 16 (App Router) + React 19 + TypeScript**, with a deterministic planning
-engine, a pluggable AI layer, and a zero-config data store.
+engine, a per-user AI layer, and a pluggable data store.
 
 ---
 
@@ -20,8 +23,8 @@ npm run dev
 # open http://localhost:3000
 ```
 
-No environment variables, database or API key is required. On first run the app seeds the demo
-scenario and stores data in `.data/db.json`.
+No environment variables, database or API key is required for local development. On first run
+the app seeds a demo scenario into `.data/db.json`.
 
 ### Demo account
 
@@ -29,7 +32,22 @@ scenario and stores data in `.data/db.json`.
 | --- | --- |
 | `sahil@university.edu` | `demo1234` |
 
-Or register a fresh account from **/onboarding**.
+The demo account is the only account that gets the deterministic engine automatically — see
+[AI layer](#ai-layer) for how every other account works. You can also register a fresh account
+from `/onboarding`.
+
+---
+
+## Scripts
+
+| Command | Purpose |
+| --- | --- |
+| `npm run dev` | Start the dev server |
+| `npm run build` | Production build |
+| `npm run start` | Serve the production build |
+| `npm run lint` | ESLint |
+| `npm run typecheck` | `tsc --noEmit` |
+| `npm run test` | Vitest (storage degradation tests) |
 
 ---
 
@@ -42,12 +60,9 @@ Or register a fresh account from **/onboarding**.
 - **Goals** — Fast Prep / Keep Up goals with target dates.
 - **Brain Dump** — natural-language extraction of tasks, deadlines, subjects, knowledge gaps,
   collaborators and goals, shown for review/edit **before** anything is saved.
-- **Notes → Prep** — upload a notes PDF (or text) in the study plan section; the text is extracted
-  and split into a topic-by-topic **learn → practice → recall** sequence, which becomes real tasks
-  (and optionally a Fast Prep goal) spread across your chosen number of days.
-- **Bring your own AI key** — Settings page with provider + **model selector** and per-user API key
-  for **OpenRouter**, **Grok (xAI)**, OpenAI and Gemini. The key is stored server-side and never
-  returned to the browser.
+- **Notes → prep plan** — upload a PDF, `.txt` or `.md`; text is extracted server-side and
+  split into topics, each with a learn → practice → recall sequence. Review it, then commit
+  the subtasks as dated tasks spread over the coming days, with an optional goal.
 - **Planning engine** — deterministic priority scoring with per-item reasons, break-aware time
   fitting, Fast Prep and Keep Up planning.
 - **Adaptive planning** — completion, skip, overrun (task took longer), deadline and
@@ -55,56 +70,68 @@ Or register a fresh account from **/onboarding**.
 - **Team Mode** — create/join teams by code or discovery, shared goal, discussions, resources,
   activity feed, member knowledge maps, strengths, gaps and peer-learning recommendations.
 - **Progress** — task completion, subject breakdown, study time, per-team coverage.
-- **Well-being / workload** — workload check-in, overload detection and one-click rebalance.
-
-Every button either works or is intentionally absent. The AI layer is **AI-assisted, not
-AI-dependent**: the app is fully functional with no API key.
+- **Well-being / workload** — workload check-in, overload detection, one-click rebalance, break
+  timer and breathing guide.
 
 ---
 
 ## Architecture
 
 ```text
-                    ┌─────────────────────┐
-                    │  Next.js App Router │
-                    │  Dashboard · Planner│
-                    │  Subjects · Teams   │
-                    │  Progress · Wellbeing│
-                    └──────────┬──────────┘
-                               │  /api/*  (route handlers)
-                    ┌──────────▼──────────┐
-                    │  Server layer       │
-                    │  auth · repo        │
-                    │  planning · http    │
-                    └────┬───────────┬────┘
-                         │           │
-              ┌──────────▼──┐   ┌────▼─────────────┐
-              │ Engines     │   │ Store            │
-              │ priority    │   │ file (default)   │
-              │ planner     │   │ → Supabase failover
-              │ team        │   └──────────────────┘
-              │ workload    │
-              │ braindump   │   ┌──────────────────┐
-              └─────────────┘   │ AI (AIService)   │
-                                │ mock/openai/gemini│
-                                └──────────────────┘
+                     ┌─────────────────────┐
+                     │  Next.js App Router │
+                     │  Dashboard · Planner│
+                     │  Subjects · Teams   │
+                     │  Progress · Settings│
+                     └──────────┬──────────┘
+                                │  /api/*  (route handlers)
+                     ┌──────────▼──────────┐
+                     │  Server layer       │
+                     │  auth · repo        │
+                     │  planning · pdf     │
+                     └────┬───────────┬────┘
+                          │           │
+               ┌──────────▼──┐   ┌────▼─────────────┐
+               │ Engines     │   │ Store            │
+               │ priority    │   │ supabase → file  │
+               │ planner     │   │ → memory fallback│
+               │ braindump   │   └──────────────────┘
+               │ notes       │   ┌──────────────────┐
+               │ team        │   │ AI               │
+               │ workload    │   │ per-user key or  │
+               └─────────────┘   │ env default      │
+                                 └──────────────────┘
 ```
 
 ### Layout
 
 ```text
-src/lib/engine/       Deterministic engines (no I/O, unit-testable)
-  priority.ts         Explainable task scoring
-  planner.ts          Break-aware plan builder + adaptive event application
-  braindump.ts        Deterministic NL extraction (mock provider + fallback)
-  team.ts             Knowledge map, strengths, gaps, peer recommendations
-  workload.ts         Overload detection + rebalance maths
+src/lib/engine/        Deterministic engines (pure, no I/O)
+  priority.ts          Explainable task scoring
+  planner.ts           Break-aware plan builder + adaptive event application
+  braindump.ts         Deterministic NL extraction
+  notes.ts             Deterministic notes → learn/practice/recall split
+  team.ts              Knowledge map, strengths, gaps, peer recommendations
+  workload.ts          Overload detection + rebalance maths
 
-src/lib/ai/           AIService abstraction + providers (mock/openai/gemini)
-src/lib/server/       Data layer: store, auth, repo, planning, seed, http helpers
-src/app/api/          Route handlers (all private routes require a session)
-src/app/              Pages (dashboard, planner, subjects, teams, progress, ...)
-src/lib/store.tsx     Client store loaded from /api/bootstrap
+src/lib/ai/            AI resolution, provider catalog, prompts
+  index.ts             resolveAI() — user key, then env, then demo
+  models.ts            Curated provider + model catalog for the Settings UI
+  providers/           mock · openai-compatible (OpenAI/OpenRouter/Grok) · gemini
+
+src/lib/server/        Data layer
+  store.ts             Supabase → file → memory adapter chain
+  auth.ts              scrypt hashing, session and reset tokens
+  repo.ts              All persistence and authorization rules
+  planning.ts          Bridges storage to the pure engines
+  pdf.ts               Server-side PDF text extraction (pdfjs legacy build)
+  seed.ts              Demo scenario, date-rebased so it is always current
+  http.ts              route() wrapper, requireUser, JSON helpers
+
+src/app/api/           32 route handlers (all private routes require a session)
+src/app/               16 pages
+src/lib/store.tsx      Client store, loaded from /api/bootstrap
+tests/                 Vitest suites
 ```
 
 ### Responsibility split
@@ -112,41 +139,71 @@ src/lib/store.tsx     Client store loaded from /api/bootstrap
 | AI is used for | Deterministic code owns |
 | --- | --- |
 | Brain dump language understanding | Auth & authorization |
-| Goal decomposition | Persistence & validation |
-| Study strategy / explanations | Deadlines, task state |
-| (optional) quiz generation | Priority, scheduling, progress |
+| Notes → study structure | Persistence & validation |
+| Goal decomposition | Deadlines, task state |
+| Study strategy / explanations | Priority, scheduling, progress |
 
 ---
 
-## Configuration (all optional)
+## AI layer
 
-Copy `.env.example` to `.env.local` if you want to change defaults.
+Resolution order for every AI request (`src/lib/ai/index.ts`):
 
-### AI provider
+1. **The user's own key** — configured in the app at `/settings`. Takes priority.
+2. **Server environment** — `AI_PROVIDER` plus a matching key, as a deployment-wide default.
+3. **Deterministic engine** — available to the demo account automatically, and to any account
+   that explicitly selects it in Settings.
+4. **No service** — a real account with no key and no env default gets `service: null` and a
+   `402` with a message pointing them at Settings. It does *not* silently return mock output.
 
-Two layers, resolved per request:
+Supported providers: **OpenRouter**, **Grok (xAI)**, **OpenAI**, **Google Gemini**, and the
+built-in **deterministic** engine. OpenAI-compatible providers share one implementation.
+`src/lib/ai/models.ts` holds the curated model list; the Settings UI also accepts a custom
+model id.
 
-1. **Per-user settings** (Settings page) — provider + model + key stored for that account.
-2. **Server environment** — `AI_PROVIDER` + matching key as a deployment-wide default.
+Two behaviours worth knowing:
 
-Supported providers: `openrouter`, `grok`, `openai`, `gemini`, and `mock` (the built-in
-deterministic engine). `OPENROUTER_API_KEY`, `XAI_API_KEY`, `OPENAI_API_KEY` and
-`GEMINI_API_KEY` are read from the environment when `AI_PROVIDER` matches.
+- **Provider failure falls back to the deterministic engine only in demo mode.** For a real
+  account on their own paid key, a provider error is surfaced rather than silently downgraded.
+- **Keys are never returned to the client.** Stored server-side per user; API responses expose
+  only a masked form (`maskKey`).
 
-**Fallback policy:** the deterministic engine is a *fallback* only in demo mode. The demo
-account (and any deployment with `DEMO_MODE=true`) degrades gracefully when no key is present or
-a provider call fails. A **real account without a key gets a clear `402`** asking it to add a key
-in Settings, rather than silently receiving mock output. Anyone may still explicitly choose
-“Deterministic (no key)” as their provider.
+### Environment variables (all optional)
 
-### Data store
+| Variable | Purpose |
+| --- | --- |
+| `AI_PROVIDER` | `mock` · `openai` · `gemini` · `openrouter` · `grok` |
+| `OPENAI_API_KEY` / `OPENAI_MODEL` | OpenAI default |
+| `GEMINI_API_KEY` / `GEMINI_MODEL` | Gemini default |
+| `OPENROUTER_API_KEY` / `OPENROUTER_MODEL` | OpenRouter default |
+| `XAI_API_KEY` / `GROK_MODEL` | Grok default |
+| `APP_URL` | Sent to OpenRouter as the `HTTP-Referer` attribution header |
+| `DEMO_MODE` | `true` treats every account as a demo account |
+| `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` | Durable storage (see below) |
 
-Storage resolves in three tiers, degrading automatically:
+Copy `.env.example` to `.env.local` to change any of them. Users can also bring their own key
+in `/settings`, which takes priority over these.
 
-1. **Supabase** — set `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` (or
-   `NEXT_PUBLIC_SUPABASE_URL` + `NEXT_PUBLIC_SUPABASE_ANON_KEY`). Durable and shared across
-   instances, and the only option suitable for a real deployment. If Supabase errors, the app
-   falls through to the next tier. Create the table once:
+---
+
+## Data store
+
+The store degrades in three steps, and the active one is reported at `/api/bootstrap`:
+
+| Order | Adapter | When |
+| --- | --- | --- |
+| 1 | **Supabase** | `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` are set and reachable |
+| 2 | **File** (`.data/db.json`) | No Supabase configured, and the filesystem is writable |
+| 3 | **Memory** | Filesystem is read-only — per-instance, non-durable |
+
+The writability probe (`store.ts:149`) runs once at startup. Serverless platforms ship a
+read-only bundle filesystem where only `/tmp` is writable, so a naive write on `process.cwd()`
+throws; probing up front lets the app fall back deliberately instead of returning a 500 on
+every request. `tests/store.test.ts` covers this path.
+
+### Supabase setup
+
+Run once in the Supabase SQL editor:
 
 ```sql
 create table if not exists app_state (
@@ -156,42 +213,40 @@ create table if not exists app_state (
 );
 ```
 
-2. **Local JSON file** at `.data/db.json` — zero config, used automatically when the filesystem
-   is writable. Right for local dev and for hosts with a persistent volume.
-3. **In-memory** — last resort when the filesystem is read-only.
+Then set `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`. The adapter talks to PostgREST over
+plain `fetch` — no SDK, no Node APIs — so it works on any runtime.
 
-> **Deploying to Vercel / Netlify?** Their serverless filesystems are read-only apart from
-> `/tmp`, so tier 2 cannot work and the app runs on tier 3. The demo account will sign in, but
-> **data is lost whenever the instance is recycled**, and sessions do not survive it, so a signed-in
-> user can be bounced back to the login screen at random. For a stable deployment, configure
-> Supabase. `GET /api/bootstrap` reports the live tier as `store.active` (`supabase` | `file` |
-> `memory`) plus `store.ephemeral`.
-
+> **Set Supabase for any real deployment.** The file store is wiped on every deploy and restart
+> on container and serverless hosts, and the memory store is lost whenever the instance is
+> recycled. Additionally, the whole database is a single JSON document under one key, so
+> concurrent writers can overwrite each other — acceptable for a demo, not for real traffic.
 
 ---
 
 ## API surface
 
+All owner-scoped and team-scoped data is authorised server-side (`requireUser`,
+`assertTeamAccess`).
+
 | Area | Routes |
 | --- | --- |
-| Auth | `POST /api/auth/register`, `POST /api/auth/login`, `POST /api/auth/logout`, `GET /api/auth/session`, `POST|PUT /api/auth/password` |
-| Bootstrap | `GET /api/bootstrap` (everything the client store needs) |
-| Profile | `GET|PATCH /api/profile` |
-| AI settings | `GET|PATCH /api/settings/ai` (providers/models/key) |
-| Notes | `GET|POST /api/notes` (upload + split), `POST /api/notes/commit`, `DELETE /api/notes/[id]` |
-| Subjects | `GET|POST /api/subjects`, `PATCH|DELETE /api/subjects/[id]` |
-| Goals | `GET|POST /api/goals`, `PATCH|DELETE /api/goals/[id]` |
-| Tasks | `GET|POST /api/tasks`, `PATCH|DELETE /api/tasks/[id]` |
-| Brain Dump | `POST /api/braindump` (extract), `PUT /api/braindump` (commit) |
-| Plan | `GET|POST|PATCH /api/plan` (read / record event / update preferences) |
-| Teams | `GET|POST /api/teams`, `POST /api/teams/join`, `GET|PATCH|DELETE /api/teams/[id]` |
+| Auth | `POST /api/auth/register`, `POST /api/auth/login`, `POST /api/auth/logout`, `GET /api/auth/session`, `POST\|PUT /api/auth/password` |
+| Bootstrap | `GET /api/bootstrap` — everything the client store needs, in one round trip |
+| Profile | `GET\|PATCH /api/profile` |
+| AI settings | `GET\|PATCH /api/settings/ai` |
+| Subjects | `GET\|POST /api/subjects`, `PATCH\|DELETE /api/subjects/[id]` |
+| Goals | `GET\|POST /api/goals`, `PATCH\|DELETE /api/goals/[id]` |
+| Tasks | `GET\|POST /api/tasks`, `PATCH\|DELETE /api/tasks/[id]` |
+| Brain dump | `POST /api/braindump` (extract), `PUT /api/braindump` (commit) |
+| Notes | `GET\|POST /api/notes`, `DELETE /api/notes/[id]`, `POST /api/notes/commit` |
+| Plan | `GET\|POST\|PATCH /api/plan` (read / record event / update preferences) |
+| Study sessions | `GET\|POST /api/study-sessions` |
+| Teams | `GET\|POST /api/teams`, `POST /api/teams/join`, `GET\|PATCH\|DELETE /api/teams/[id]` |
 | Team detail | `.../messages`, `.../checkins`, `.../members/[memberId]` |
-| Resources | `GET|POST /api/resources`, `DELETE /api/resources/[id]` |
+| Resources | `GET\|POST /api/resources`, `DELETE /api/resources/[id]` |
 | Progress | `GET /api/progress` |
-| Notifications | `GET|POST /api/notifications`, `PATCH /api/notifications/[id]` |
+| Notifications | `GET\|POST /api/notifications`, `PATCH /api/notifications/[id]` |
 | Well-being | `POST /api/wellbeing` |
-
-All owner-scoped and team-scoped data is authorised server-side (`requireUser`, `assertTeamAccess`).
 
 ---
 
@@ -199,35 +254,64 @@ All owner-scoped and team-scoped data is authorised server-side (`requireUser`, 
 
 - Passwords hashed with scrypt; sessions are opaque server-side tokens in httpOnly cookies.
 - `requireUser` guards every private route; team access is checked on every team route.
+- Per-user AI keys are stored server-side and only ever returned masked.
 - Input validation on all mutations; no secrets in the client bundle.
-- Password reset returns the token directly **only because no email provider is configured** in
-  the prototype — wire an email service and stop returning `reset_token` for production.
+- Password reset returns the token directly **only because no email provider is configured** —
+  wire an email service and stop returning `reset_token` before production.
+
+---
+
+## Deployment
+
+Works on any Node host: Vercel, Railway, Render, Fly, or a container. Next.js needs no extra
+config.
+
+**On serverless, Supabase is required for persistence.** Without it the app still boots and
+the demo account still signs in, but data lives in the per-instance memory store and is lost
+on every cold start. Set `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` in the host's
+environment settings before your first deploy.
+
+Not suitable for Cloudflare Workers/Pages as written: `node:fs` and `process.cwd()` are
+unavailable, and `scryptSync` in the auth layer is not implemented in that runtime. Porting
+would mean Supabase as the only store, replacing scrypt with WebCrypto PBKDF2, and the
+OpenNext adapter.
 
 ---
 
 ## Demo scenario
 
-Log in as the demo student and you get the plan's primary demonstration out of the box:
+Log in as the demo student:
 
-1. **Planner** → brain dump is pre-filled → *Extract data* → review tasks / gap / goal / team.
+1. **Planner** → brain dump is pre-filled → *Extract data* → review tasks, gaps, goals, team.
 2. **Confirm & create** → tasks and goals appear, the gap lowers your Maths confidence.
-3. **Dashboard** shows the next step with its reasons, the plan and the workload assessment.
+3. **Dashboard** shows the next step with its reasons, the plan, and the workload assessment.
 4. *Start session* → *Mark complete*, or overrun a task to see **adaptive rescheduling**.
-5. **Teams** → `Maths Survivors` team → knowledge map, strengths, gaps and peer recommendation.
+5. **Planner → Notes to Prep** → upload a PDF, `.txt` or `.md` → *Split into prep* →
+   review the topic split → *Add to my plan*.
+6. **Teams** → `Maths Survivors` → knowledge map, strengths, gaps, peer recommendation.
 
 ---
 
-## Scripts
+## Roadmap (intentionally out of scope)
 
-```bash
-npm run dev      # start the dev server
-npm run build    # production build
-npm run start    # run the production build
-npm run lint     # eslint
-```
-
-## Roadmap (intentionally out of MVP scope)
-
-Lecture/video analysis, full LMS / calendar sync, public profiles, gamification, real-time
-co-editing and autonomous AI actions are documented as future work and are deliberately not
+Lecture/video analysis, full LMS and calendar sync, public profiles, gamification, real-time
+co-editing, and autonomous AI actions are documented as future work and are deliberately not
 implemented.
+
+---
+
+## Known limitations
+
+Recorded honestly so they are not a surprise:
+
+- The file and memory stores are single-process only. The write queue serialises mutations
+  **in-process**, so multiple instances each hold their own copy and can lose writes. Supabase
+  removes this constraint but still stores the database as one document, so concurrent writers
+  can still overwrite each other.
+- Every read re-reads the database, and `transact` persists unconditionally — read-only
+  requests also write. With a network-backed store this is several round trips per request.
+- `POST /api/tasks` accepts a `team_id` from the request body without verifying team
+  membership, unlike the equivalent check on `POST /api/resources`.
+- PDF import requires selectable text. Scanned pages need OCR first and return a `422`.
+- `/team-join` and `/team-workspace` are thin aliases of `/teams` and the team detail view.
+- Route protection is client-side; enforcement is server-side via `requireUser`.
