@@ -103,7 +103,7 @@ export type Database = {
           subject_name: string;
           title: string;
           description: string;
-          status: 'todo' | 'in_progress' | 'review' | 'done';
+          status: 'todo' | 'in_progress' | 'review' | 'done' | 'skipped';
           priority: 'low' | 'medium' | 'high' | 'urgent';
           due_date: string;
           estimated_minutes: number;
@@ -121,7 +121,7 @@ export type Database = {
           subject_name?: string;
           title: string;
           description?: string;
-          status?: 'todo' | 'in_progress' | 'review' | 'done';
+          status?: 'todo' | 'in_progress' | 'review' | 'done' | 'skipped';
           priority?: 'low' | 'medium' | 'high' | 'urgent';
           due_date: string;
           estimated_minutes?: number;
@@ -139,7 +139,7 @@ export type Database = {
           subject_name?: string;
           title?: string;
           description?: string;
-          status?: 'todo' | 'in_progress' | 'review' | 'done';
+          status?: 'todo' | 'in_progress' | 'review' | 'done' | 'skipped';
           priority?: 'low' | 'medium' | 'high' | 'urgent';
           due_date?: string;
           estimated_minutes?: number;

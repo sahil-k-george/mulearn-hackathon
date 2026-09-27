@@ -250,6 +250,30 @@ html, body {
   width: 100%;
 }
 
+/* Public (unauthenticated) pages render without the sidebar. */
+.main-content--public {
+  max-width: none;
+  padding: 24px;
+}
+
+button.nav-item {
+  text-align: left;
+  font: inherit;
+}
+
+.spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .nav-item {
   display: flex;
   align-items: center;

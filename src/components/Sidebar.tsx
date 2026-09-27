@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { 
   LayoutDashboard, 
   BookOpen, 
@@ -14,15 +14,17 @@ import {
   Bell,
   X,
   Menu,
-  Coffee
+  Coffee,
+  Settings as SettingsIcon
 } from "lucide-react";
 import { useState } from "react";
 import { useApp } from "@/lib/store";
 
 export function Sidebar() {
   const pathname = usePathname();
+  const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const { notifications, user } = useApp();
+  const { notifications, user, signOut, aiStatus, storeInfo } = useApp();
 
   const unreadCount = notifications.filter(n => !n.is_read).length;
 
@@ -40,6 +42,7 @@ export function Sidebar() {
     { href: "/team-workspace", label: "Team Workspace", icon: Users2, indent: true },
     { href: "/resources", label: "Resources", icon: FolderGit2 },
     { href: "/wellbeing", label: "Break & Well-being", icon: Coffee },
+    { href: "/settings", label: "AI Settings", icon: SettingsIcon },
     { href: "/profile", label: "Profile", icon: UserCircle2, badge: unreadCount > 0 ? unreadCount : undefined },
   ];
 
@@ -127,15 +130,24 @@ export function Sidebar() {
           })}
 
           <div style={{ marginTop: 'auto', paddingTop: '24px', borderTop: '1px solid var(--border-light)' }}>
-            <Link 
-              href="/login" 
-              className="nav-item" 
-              style={{ color: 'var(--text-secondary)' }}
-              onClick={() => setMobileOpen(false)}
+            {aiStatus && (
+              <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '10px', lineHeight: 1.5 }}>
+                AI: {aiStatus.requires_key ? 'key needed' : aiStatus.mock_fallback ? 'mock mode' : aiStatus.active} · DB:{' '}
+                {storeInfo?.active ?? 'file'}
+              </p>
+            )}
+            <button
+              className="nav-item"
+              style={{ color: 'var(--text-secondary)', background: 'none', border: 'none', width: '100%', cursor: 'pointer' }}
+              onClick={async () => {
+                setMobileOpen(false);
+                await signOut();
+                router.replace('/login');
+              }}
             >
               <LogOut size={18} style={{ opacity: 0.7 }} />
               <span>Logout</span>
-            </Link>
+            </button>
           </div>
         </nav>
       </aside>

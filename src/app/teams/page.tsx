@@ -76,7 +76,7 @@ export default function TeamsPage() {
     return matchesSearch && t.visibility === 'discoverable';
   });
 
-  const handleCreateTeamSubmit = (e: React.FormEvent) => {
+  const handleCreateTeamSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!teamName.trim() || !teamGoal.trim()) return;
 
@@ -85,7 +85,7 @@ export default function TeamsPage() {
       .map(t => t.trim())
       .filter(t => t.length > 0);
 
-    const newTeam = createTeam({
+    const newTeam = await createTeam({
       name: teamName.trim(),
       description: teamDesc.trim(),
       goal: teamGoal.trim(),
@@ -107,11 +107,11 @@ export default function TeamsPage() {
     router.push(`/teams/${newTeam.id}`);
   };
 
-  const handleJoinByCode = (e: React.FormEvent) => {
+  const handleJoinByCode = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!inputCode.trim()) return;
 
-    const result = joinTeamByCode(inputCode.trim());
+    const result = await joinTeamByCode(inputCode.trim());
     if (result.success) {
       setJoinStatus({ type: 'success', message: result.message });
       setInputCode('');
@@ -125,8 +125,8 @@ export default function TeamsPage() {
     }
   };
 
-  const handleDiscoverJoin = (teamId: string) => {
-    const result = joinDiscoverableTeam(teamId);
+  const handleDiscoverJoin = async (teamId: string) => {
+    const result = await joinDiscoverableTeam(teamId);
     if (result.success) {
       router.push(`/teams/${teamId}`);
     }
